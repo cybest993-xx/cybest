@@ -1,30 +1,26 @@
 FROM node:alpine3.20
 
-# 1. 把构建过程放在 /app (安全区)
+# 1. 把代码构建在安全目录 /app
 WORKDIR /app
-
-# 2. 复制代码到 /app
 COPY . .
 
 EXPOSE 3000/tcp
 
-# 3. 安装依赖 & 设置权限
+# 2. 安装环境、创建用户、设置权限
 RUN apk update && apk upgrade &&\
     apk add --no-cache openssl curl gcompat iproute2 coreutils bash &&\
-    # 创建用户 10014
     adduser -D -u 10014 -h /tmp choreouser &&\
     chmod +x index.js &&\
     npm install &&\
-    # 关键：把 /app (源代码) 和 /tmp (运行地) 的权限都给 10014
+    # 确保用户拥有源目录和目标目录的权限
     chown -R 10014:10014 /app &&\
     chown -R 10014:10014 /tmp
 
-# 4. 设置环境变量
+# 3. 设置 HOME 变量，防止 Node 访问 /root
 ENV HOME=/tmp
 
-# 5. 切换用户
+# 4. 切换到非 Root 用户
 USER 10014
 
-# 6. 【核心修复】使用 Shell 组合命令
-# 逻辑：启动瞬间 -> 把 /app 下的所有文件拷贝到 /tmp -> 进入 /tmp -> 启动 Node
+# 5. 【终极解决方案】启动时：复制 /app -> /tmp，然后运行
 CMD ["/bin/sh", "-c", "cp -r /app/. /tmp/ && cd /tmp && node index.js"]
